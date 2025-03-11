@@ -29,7 +29,7 @@ Visualisasi Geolokasi: Menampilkan peta distribusi pelanggan di Brasil.
 🔧 Instalasi dan Menjalankan Aplikasi
 - Clone repositori (jika menggunakan GitHub):
 ```git clone https://github.com/hafizhaqolby/analysis-data.git
-cd dashboard
+cd analysis-data
 ```
 - Buat Virtual Environment (Opsional, tapi disarankan)
 ```python -m venv venv
@@ -39,6 +39,10 @@ venv\Scripts\activate  # Windows
 - Install dependensi
 ```
 pip install -r requirements.txt
+```
+- Arahkan ke folder dashboard
+```
+cd dashboard
 ```
 - Jalankan Streamlit App
 ```
