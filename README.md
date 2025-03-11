@@ -29,7 +29,7 @@ Visualisasi Geolokasi: Menampilkan peta distribusi pelanggan di Brasil.
 🔧 Instalasi dan Menjalankan Aplikasi
 - Clone repositori (jika menggunakan GitHub):
 ```git clone https://github.com/hafizhaqolby/analysis-data.git
-cd repository
+cd dashboard
 ```
 - Buat Virtual Environment (Opsional, tapi disarankan)
 ```python -m venv venv
