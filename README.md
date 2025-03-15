@@ -18,6 +18,7 @@ Visualisasi Geolokasi: Menampilkan peta distribusi pelanggan di Brasil.
 │   │-- main.py
 │   │-- func.py
 │   │-- gcl.png
+│   │-- requirements.txt
 │-- data/
 │   │-- customers_dataset.csv
 │   │-- geolocation_dataset.csv
@@ -28,7 +29,6 @@ Visualisasi Geolokasi: Menampilkan peta distribusi pelanggan di Brasil.
 │   │-- product_category_name_translation.csv
 │   │-- products_dataset.csv
 │   │-- sellers_dataset.csv
-│-- requirements.txt
 │-- README.md
 │-- Proyek_Analisis_Data.ipynb
 ```
