@@ -14,16 +14,16 @@ Visualisasi Geolokasi: Menampilkan peta distribusi pelanggan di Brasil.
 
 📂 Struktur Folder <br>
 ```
-│-- dashboard/<br>
-│   │-- main.py<br>
-│   │-- func.py<br>
-│   │-- gcl.png<br>
-│-- data/<br>
-│   │-- all_data.csv<br>
-│   │-- geolocation.csv<br>
-│-- requirements.txt<br>
-│-- README.md<br>
-│-- Proyek_Analisis_Data.ipynb<br>
+│-- dashboard/
+│   │-- main.py
+│   │-- func.py
+│   │-- gcl.png
+│-- data/
+│   │-- df.csv
+│   │-- geolocation.csv
+│-- requirements.txt
+│-- README.md
+│-- Proyek_Analisis_Data.ipynb
 ```
 
 🔧 Instalasi dan Menjalankan Aplikasi
