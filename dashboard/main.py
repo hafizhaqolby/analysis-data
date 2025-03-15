@@ -1,39 +1,72 @@
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.image as mpimg
 import seaborn as sns
 import streamlit as st
-import urllib
-from func import DataAnalyzer, BrazilMapPlotter
-from babel.numbers import format_currency
+import urllib.request
+from io import StringIO
 
-sns.set(style='dark')
+# ----------------- 1. Load Dataset dari GitHub dengan urllib ----------------- #
+BASE_URL = "https://raw.githubusercontent.com/hafizhaqolby/analysis-data/main/data/"
 
-# Dataset
-datetime_cols = ["order_approved_at", "order_delivered_carrier_date", "order_delivered_customer_date", "order_estimated_delivery_date", "order_purchase_timestamp", "shipping_limit_date"]
-all_df = pd.read_csv("df.csv")
-all_df.sort_values(by="order_approved_at", inplace=True)
-all_df.reset_index(inplace=True)
+def load_csv(url):
+    response = urllib.request.urlopen(url)
+    return pd.read_csv(StringIO(response.read().decode('utf-8')))
 
-# Geolocation Dataset
-geolocation = pd.read_csv("geolocation.csv")
-data = geolocation.drop_duplicates(subset='customer_unique_id')
+# Load datasets
+orders = load_csv(BASE_URL + 'orders_dataset.csv')
+items = load_csv(BASE_URL + 'order_items_dataset.csv')
+products = load_csv(BASE_URL + 'products_dataset.csv')
+payments = load_csv(BASE_URL + 'order_payments_dataset.csv')
+reviews = load_csv(BASE_URL + 'order_reviews_dataset.csv')
+customers = load_csv(BASE_URL + 'customers_dataset.csv')
+sellers = load_csv(BASE_URL + 'sellers_dataset.csv')
+geolocation = load_csv(BASE_URL + 'geolocation_dataset.csv')
+category = load_csv(BASE_URL + 'product_category_name_translation.csv')
 
-for col in datetime_cols:
-    all_df[col] = pd.to_datetime(all_df[col])
+data = {
+    'orders': orders,
+    'items': items,
+    'products': products,
+    'payments': payments,
+    'reviews': reviews,
+    'customers': customers,
+    'sellers': sellers,
+    'geo': geolocation,
+    'category': category
+}
 
-min_date = all_df["order_approved_at"].min()
-max_date = all_df["order_approved_at"].max()
+# ----------------- 2. Data Preprocessing ----------------- #
+# Merge dataset orders dan items dengan produk
+items_product = data['items'].merge(data['products'], on='product_id', how='inner')
+orders_ip = data['orders'].merge(items_product, on='order_id', how='inner')
 
-# Sidebar
+# Pivot table untuk menghitung total pendapatan dan probabilitas penjualan
+product_revenue = orders_ip.pivot_table(index=['product_id'], aggfunc={'order_item_id': 'sum', 'price': 'mean'})
+product_revenue['total'] = product_revenue['order_item_id'] * product_revenue['price']
+product_revenue.rename(columns={'order_item_id': 'sell_probability'}, inplace=True)
+product_revenue['sell_probability'] = product_revenue['sell_probability'] / len(product_revenue)
+product_revenue.sort_values(by='total', ascending=False, inplace=True)
+
+# ----------------- 3. Sidebar ----------------- #
 with st.sidebar:
-    # Title
+    # Nama & Logo
     st.title("Hafizha Nurul Q.")
+    st.image("gcl.png", width=200)
 
-    # Logo Image
-    st.image("gcl.png")
+    # Filter Rentang Tanggal
+    datetime_cols = ["order_approved_at", "order_delivered_carrier_date", "order_delivered_customer_date",
+                     "order_estimated_delivery_date", "order_purchase_timestamp", "shipping_limit_date"]
 
-    # Date Range
+    for col in datetime_cols:
+        if col in orders.columns:
+            orders[col] = pd.to_datetime(orders[col], errors='coerce')
+        else:
+            print(f"Warning: Column {col} not found in orders dataset")
+
+    min_date = orders["order_approved_at"].min()
+    max_date = orders["order_approved_at"].max()
+
     start_date, end_date = st.date_input(
         label="Select Date Range",
         value=[min_date, max_date],
@@ -41,177 +74,56 @@ with st.sidebar:
         max_value=max_date
     )
 
-# Main
-main_df = all_df[(all_df["order_approved_at"] >= str(start_date)) & 
-                 (all_df["order_approved_at"] <= str(end_date))]
+    # Filter Data
+    filtered_orders = orders[(orders["order_approved_at"] >= str(start_date)) & 
+                             (orders["order_approved_at"] <= str(end_date))]
 
-function = DataAnalyzer(main_df)
-map_plot = BrazilMapPlotter(data, plt, mpimg, urllib, st)
+# ----------------- 4. Visualisasi Produk ----------------- #
+st.title("📊 Product Analysis")
 
-daily_orders_df = function.create_daily_orders_df()
-sum_spend_df = function.create_sum_spend_df()
-sum_order_items_df = function.create_sum_order_items_df()
-review_score, common_score = function.review_score_df()
-state, most_common_state = function.create_bystate_df()
-order_status, common_status = function.create_order_status()
+x = np.log(product_revenue.sell_probability)
+y = np.log(product_revenue.price)
 
-# Define your Streamlit app
-st.title("E-Commerce Dashboard")
+fig, ax = plt.subplots(figsize=(8, 6))
+sns.set(style='darkgrid')
 
-# Add text or descriptions
-st.write("**This is a dashboard for analyzing E-Commerce public data.**")
+hb = ax.hexbin(x, y, gridsize=14, C=product_revenue.total, reduce_C_function=np.sum, cmap='cividis')
+cb = fig.colorbar(hb, ax=ax)
+cb.set_label('Product Revenue (R$)', rotation=270, labelpad=20, fontsize=12)
 
-# Daily Orders
-st.subheader("Daily Orders")
-
-col1, col2 = st.columns(2)
-
-with col1:
-    total_order = daily_orders_df["order_count"].sum()
-    st.markdown(f"Total Order: **{total_order}**")
-
-with col2:
-    total_revenue = daily_orders_df["revenue"].sum()
-    st.markdown(f"Total Revenue: **{total_revenue}**")
-
-fig, ax = plt.subplots(figsize=(12, 6))
-ax.plot(
-    daily_orders_df["order_approved_at"],
-    daily_orders_df["order_count"],
-    marker="o",
-    linewidth=2,
-    color="#90CAF9"
-)
-ax.tick_params(axis="x", rotation=45)
-ax.tick_params(axis="y", labelsize=15)
-st.pyplot(fig)
-
-# Customer Spend Money
-st.subheader("Customer Spend Money")
-col1, col2 = st.columns(2)
-
-with col1:
-    total_spend = format_currency(sum_spend_df["total_spend"].sum(), "IDR", locale="id_ID")
-    st.markdown(f"Total Spend: **{total_spend}**")
-
-with col2:
-    avg_spend = format_currency(sum_spend_df["total_spend"].mean(), "IDR", locale="id_ID")
-    st.markdown(f"Average Spend: **{avg_spend}**")
-
-fig, ax = plt.subplots(figsize=(12, 6))
-ax.plot(
-    sum_spend_df["order_approved_at"],
-    sum_spend_df["total_spend"],
-    marker="o",
-    linewidth=2,
-    color="#90CAF9"
-)
-ax.tick_params(axis="x", rotation=45)
-ax.tick_params(axis="y", labelsize=15)
-st.pyplot(fig)
-
-# Order Items
-st.subheader("Order Items")
-col1, col2 = st.columns(2)
-
-with col1:
-    total_items = sum_order_items_df["product_count"].sum()
-    st.markdown(f"Total Items: **{total_items}**")
-
-with col2:
-    avg_items = sum_order_items_df["product_count"].mean()
-    st.markdown(f"Average Items: **{avg_items}**")
-
-fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(45, 25))
-
-colors = ["#068DA9", "#D3D3D3", "#D3D3D3", "#D3D3D3", "#D3D3D3"]
-
-sns.barplot(x="product_count", y="product_category_name_english", data=sum_order_items_df.head(5), palette=colors, ax=ax[0])
-ax[0].set_ylabel(None)
-ax[0].set_xlabel("Number of Sales", fontsize=30)
-ax[0].set_title("Produk paling banyak terjual", loc="center", fontsize=50)
-ax[0].tick_params(axis ='y', labelsize=35)
-ax[0].tick_params(axis ='x', labelsize=30)
-
-sns.barplot(x="product_count", y="product_category_name_english", data=sum_order_items_df.sort_values(by="product_count", ascending=True).head(5), palette=colors, ax=ax[1])
-ax[1].set_ylabel(None)
-ax[1].set_xlabel("Number of Sales", fontsize=30)
-ax[1].invert_xaxis()
-ax[1].yaxis.set_label_position("right")
-ax[1].yaxis.tick_right()
-ax[1].set_title("Produk paling sedikit terjual", loc="center", fontsize=50)
-ax[1].tick_params(axis='y', labelsize=35)
-ax[1].tick_params(axis='x', labelsize=30)
+plt.title('Product Price vs. Sell Probability', fontsize=16)
+plt.xlabel('Log Sell Probability', fontsize=12)
+plt.ylabel('Log Product Price', fontsize=12)
 
 st.pyplot(fig)
 
-# Review Score
-st.subheader("Review Score")
-col1,col2 = st.columns(2)
+# ----------------- 5. Visualisasi Geolocation ----------------- #
+st.title("🗺️ Customer Geolocation in Brazil")
 
-with col1:
-    avg_review_score = review_score.mean()
-    st.markdown(f"Average Review Score: **{avg_review_score}**")
+# Preprocessing Geolocation Data
+geo_grouped = data['geo'].groupby(['geolocation_zip_code_prefix', 'geolocation_state'])\
+    .size().reset_index(name='count')
+geo_most_common_state = geo_grouped.drop_duplicates(subset='geolocation_zip_code_prefix')
 
-with col2:
-    most_common_review_score = review_score.value_counts().index[0]
-    st.markdown(f"Most Common Review Score: **{most_common_review_score}**")
+geolocation_silver = data['geo'].groupby(['geolocation_zip_code_prefix', 'geolocation_city', 'geolocation_state'])[
+    ['geolocation_lat', 'geolocation_lng']].median().reset_index()
 
-fig, ax = plt.subplots(figsize=(12, 6))
-sns.barplot(x=review_score.index, 
-            y=review_score.values, 
-            order=review_score.index,
-            palette=["#068DA9" if score == common_score else "#D3D3D3" for score in review_score.index]
-            )
+geolocation_silver = geolocation_silver.merge(geo_most_common_state, on=['geolocation_zip_code_prefix', 'geolocation_state'], how='inner')
+customers_silver = customers.merge(geolocation_silver, left_on='customer_zip_code_prefix',
+                                   right_on='geolocation_zip_code_prefix', how='inner').drop_duplicates('customer_id')
 
-plt.title("Rating by customers for service", fontsize=15)
-plt.xlabel("Rating")
-plt.ylabel("Count")
-plt.xticks(fontsize=12)
-st.pyplot(fig)
+# Plot Brazil Map
+def plot_brazil_map(data):
+    brazil_map_url = "https://i.pinimg.com/originals/3a/0c/e1/3a0ce18b3c842748c255bc0aa445ad41.jpg"
+    brazil = plt.imread(urllib.request.urlopen(brazil_map_url), 'jpg')
 
-# Customer Demographic
-st.subheader("Customer Demographic")
-tab1, tab2, tab3 = st.tabs(["State", "Order Status", "Geolocation"])
-
-with tab1:
-    most_common_state = state.customer_state.value_counts().index[0]
-    st.markdown(f"Most Common State: **{most_common_state}**")
-
-    fig, ax = plt.subplots(figsize=(12, 6))
-    sns.barplot(x=state.customer_state.value_counts().index,
-                y=state.customer_count.values, 
-                data=state,
-                palette=["#068DA9" if score == most_common_state else "#D3D3D3" for score in state.customer_state.value_counts().index]
-                    )
-
-    plt.title("Number customers from State", fontsize=15)
-    plt.xlabel("State")
-    plt.ylabel("Number of Customers")
-    plt.xticks(fontsize=12)
+    fig, ax = plt.subplots(figsize=(10, 10))
+    data.plot(kind="scatter", x="geolocation_lng", y="geolocation_lat", figsize=(10, 10), alpha=0.3, s=0.3, c='maroon', ax=ax)
+    ax.imshow(brazil, extent=[-73.98283055, -33.8, -33.75116944, 5.4])
+    plt.axis('off')
     st.pyplot(fig)
 
-with tab2:
-    common_status_ = order_status.value_counts().index[0]
-    st.markdown(f"Most Common Order Status: **{common_status_}**")
+# Menampilkan Peta
+plot_brazil_map(customers_silver.drop_duplicates(subset='customer_unique_id'))
 
-    fig, ax = plt.subplots(figsize=(12, 6))
-    sns.barplot(x=order_status.index,
-                y=order_status.values,
-                order=order_status.index,
-                palette=["#068DA9" if score == common_status else "#D3D3D3" for score in order_status.index]
-                )
-    
-    plt.title("Order Status", fontsize=15)
-    plt.xlabel("Status")
-    plt.ylabel("Count")
-    plt.xticks(fontsize=12)
-    st.pyplot(fig)
-
-with tab3:
-    map_plot.plot()
-
-    with st.expander("See Explanation"):
-        st.write('Berdasarkan grafik yang telah dibuat, terdapat lebih banyak pelanggan di wilayah tenggara dan selatan. Informasi lainnya, terdapat lebih banyak pelanggan di kota-kota yang merupakan ibu kota (São Paulo, Rio de Janeiro, Porto Alegre, dan lainnya).')
-
-st.caption('Copyright (C) Hafizha N. Q. 2025')
+st.caption('© 2025 E-Commerce Analysis Dashboard')
