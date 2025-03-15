@@ -11,12 +11,12 @@ sns.set(style='dark')
 
 # Dataset
 datetime_cols = ["order_approved_at", "order_delivered_carrier_date", "order_delivered_customer_date", "order_estimated_delivery_date", "order_purchase_timestamp", "shipping_limit_date"]
-all_df = pd.read_csv("../data/df.csv")
+all_df = pd.read_csv("df.csv")
 all_df.sort_values(by="order_approved_at", inplace=True)
 all_df.reset_index(inplace=True)
 
 # Geolocation Dataset
-geolocation = pd.read_csv(r"D:\analysis data\data\geolocation.csv")
+geolocation = pd.read_csv("geolocation.csv")
 data = geolocation.drop_duplicates(subset='customer_unique_id')
 
 for col in datetime_cols:
@@ -28,7 +28,7 @@ max_date = all_df["order_approved_at"].max()
 # Sidebar
 with st.sidebar:
     # Title
-    st.title("Hafizha N. Q.")
+    st.title("Hafizha Nurul Q.")
 
     # Logo Image
     st.image("gcl.png")
