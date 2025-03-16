@@ -31,6 +31,7 @@ Visualisasi Geolokasi: Menampilkan peta distribusi pelanggan di Brasil.
 │   │-- sellers_dataset.csv
 │-- README.md
 │-- Proyek_Analisis_Data.ipynb
+│-- requirements.txt
 ```
 
 🔧 Instalasi dan Menjalankan Aplikasi
